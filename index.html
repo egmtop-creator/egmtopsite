@@ -1,37 +1,62 @@
 <!DOCTYPE html>
-<html>
+<html lang="ru">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>EGMTOP</title>
-  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="style.css" />
 </head>
+
 <body>
+  <header class="topbar">
+    <div class="logo">EGMTOP</div>
 
-<header>
-  <h1>EGMTOP</h1>
-  <nav>
-    <a href="#">Home</a>
-    <a href="#">About</a>
-    <a href="#">Mini Chat</a>
-    <a href="#">Clicker</a>
-  </nav>
-</header>
+    <nav class="nav">
+      <a href="#home">Home</a>
+      <a href="#about">About</a>
+      <a href="#chat">Mini Chat</a>
+      <a href="#clicker">Clicker</a>
+    </nav>
+  </header>
 
-<section class="hero">
-  <h2>Welcome to my site</h2>
-</section>
+  <section class="hero" id="home">
+    <h1>Welcome to my site</h1>
+    <p>Dark Cyber mode</p>
+  </section>
 
-<section class="content">
-  <div class="box">Video</div>
-  <div class="box">Mini Chat</div>
-  <div class="box">Clicker</div>
-</section>
+  <section class="content">
+    <!-- GAME 1 -->
+    <div class="box" id="about">
+      <h3>Ball Pop</h3>
+      <button class="game-btn" id="ballBtn">Spawn</button>
+      <div class="playfield" id="playfield"></div>
+      <div class="hint">Нажми Spawn → шарики на 5 сек</div>
+    </div>
 
-<footer>
-  © 2026 EGMTOP
-</footer>
+    <!-- GAME 2 -->
+    <div class="box" id="chat">
+      <h3>Mini Chat</h3>
+      <input class="chat-input" id="nameInput" placeholder="Name">
+      <input class="chat-input" id="msgInput" placeholder="Message">
+      <button class="game-btn" id="sendBtn">Send</button>
+      <div class="chat-log" id="chatLog"></div>
+      <div class="hint">Локально (видишь только ты)</div>
+    </div>
 
+    <!-- GAME 3 -->
+    <div class="box" id="clicker">
+      <h3>Clicker</h3>
+      <div class="big-score" id="score">0</div>
+      <button class="game-btn" id="clickBtn">CLICK</button>
+      <button class="mini-btn" id="resetBtn">Reset</button>
+      <div class="hint">Кликай → счёт растёт</div>
+    </div>
+  </section>
+
+  <footer class="footer">
+    © 2026 EGMTOP
+  </footer>
+
+  <script src="script.js"></script>
 </body>
 </html>
-
-
