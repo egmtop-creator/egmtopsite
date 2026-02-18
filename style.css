@@ -1,27 +1,50 @@
 body {
   margin: 0;
   font-family: Arial;
-  background: #f2f2f2;
+  background: #111;
+  color: white;
 }
 
 header {
-  background: #222;
-  color: white;
+  background: black;
   padding: 20px;
-  text-align: center;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-main {
-  padding: 40px;
-  text-align: center;
-}
-
-button {
-  padding: 10px 20px;
-  border: none;
-  background: blue;
+nav a {
   color: white;
-  border-radius: 5px;
-  cursor: pointer;
+  margin-left: 20px;
+  text-decoration: none;
 }
+
+.hero {
+  text-align: center;
+  padding: 60px;
+  background: #222;
+}
+
+.content {
+  display: flex;
+  justify-content: space-around;
+  padding: 40px;
+}
+
+.box {
+  width: 250px;
+  height: 200px;
+  background: #333;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border-radius: 10px;
+}
+
+footer {
+  text-align: center;
+  padding: 20px;
+  background: black;
+}
+
 
