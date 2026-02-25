@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>1v1 Mini Brawl (Hızlı + Ateş)</title>
+  <title>1v1 Mini Brawl (ÇOK Hızlı Karakter + Ateş)</title>
   <style>
     html, body { margin:0; padding:0; height:100%; background:#0b0f14; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
     #wrap { position:relative; width:100%; height:100%; overflow:hidden; touch-action:none; }
@@ -138,7 +138,7 @@
 
   <div class="centerTop">
     <button class="btn" id="restartBtn">Yeniden Başlat</button>
-    <div style="opacity:.9; font-weight:800;">1v1 Mini Brawl • Ateş</div>
+    <div style="opacity:.9; font-weight:800;">1v1 Mini Brawl • Hızlı</div>
   </div>
 
   <div class="tip">
@@ -183,7 +183,6 @@
   const win = document.getElementById('win');
   const winTitle = document.getElementById('winTitle');
 
-  // Resize
   function fit() {
     const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
     canvas.width = Math.floor(canvas.clientWidth * dpr);
@@ -193,11 +192,9 @@
   const ro = new ResizeObserver(fit);
   ro.observe(document.getElementById('wrap'));
 
-  // Helpers
   const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
   const norm = (x,y)=>{ const L=Math.hypot(x,y)||1; return {x:x/L,y:y/L}; };
 
-  // Collision
   function circleRectCollide(cx, cy, r, rect) {
     const rx=rect.x, ry=rect.y, rw=rect.w, rh=rect.h;
     const closestX = clamp(cx, rx, rx + rw);
@@ -220,7 +217,6 @@
     }
   }
 
-  // World
   const world = {
     w: ()=>canvas.clientWidth,
     h: ()=>canvas.clientHeight,
@@ -242,9 +238,7 @@
     ];
   }
 
-  // Players + bullets
   const maxHP = 100;
-
   const players = { p1:null, p2:null };
   let bullets = []; // {x,y,vx,vy,r,owner,life}
 
@@ -268,12 +262,9 @@
     win.style.display="none";
   }
 
-  // JOYSTICK
   function makeJoystick(zoneEl, stickEl, onVector) {
     const state = { active:false, pid:null };
-
     function rect(){ return zoneEl.getBoundingClientRect(); }
-
     function setStick(vx,vy){
       const r = rect();
       const maxR = Math.min(r.width,r.height) * 0.28;
@@ -281,7 +272,6 @@
       const py = vy * maxR;
       stickEl.style.transform = `translate(calc(-50% + ${px}px), calc(-50% + ${py}px))`;
     }
-
     function update(clientX, clientY){
       const r = rect();
       const cx = r.left + r.width/2;
@@ -301,7 +291,6 @@
       setStick(vx,vy);
       onVector(vx,vy);
     }
-
     function end(){
       state.active=false; state.pid=null;
       stickEl.style.transform = `translate(-50%, -50%)`;
@@ -348,13 +337,15 @@
     (x,y)=>{ if(players.p2) players.p2.atk={x,y}; }
   );
 
-  // ======= НАСТРОЙКИ СКОРОСТИ/СТРЕЛЬБЫ (сделал быстрее) =======
-  const SPEED = 420;        // было медленно -> быстрее
-  const FRICTION = 7.5;     // меньше трения -> быстрее разгон/движение
-  const BULLET_SPEED = 820; // скорость пули
-  const BULLET_DAMAGE = 10; // урон
-  const BULLET_CD = 0.09;   // скорострельность (меньше = быстрее)
-  const BULLET_LIFE = 1.2;  // сек
+  // ======= СДЕЛАЛ ПЕРСОНАЖЕЙ БЫСТРЕЕ =======
+  const SPEED = 760;        // было 420 -> теперь очень быстро
+  const FRICTION = 4.0;     // меньше трения -> быстрее разгон/скольжение
+
+  // Shooting
+  const BULLET_SPEED = 820;
+  const BULLET_DAMAGE = 10;
+  const BULLET_CD = 0.09;
+  const BULLET_LIFE = 1.2;
   const BULLET_R = 4;
 
   function spawnBullet(shooter, dir) {
@@ -385,7 +376,6 @@
     const p1=players.p1, p2=players.p2;
     if(!p1 || !p2) return;
 
-    // Movement
     for(const p of [p1,p2]){
       let mx=p.move.x, my=p.move.y;
       const L=Math.hypot(mx,my);
@@ -407,7 +397,6 @@
       p.y = clamp(p.y, p.r+60, world.h()-p.r);
     }
 
-    // Shooting (hold attack joystick)
     function handleShoot(shooter){
       shooter.shootCd = Math.max(0, shooter.shootCd - dt);
       const ax=shooter.atk.x, ay=shooter.atk.y;
@@ -425,7 +414,6 @@
     handleShoot(p1);
     handleShoot(p2);
 
-    // Bullets update + collisions
     const victimOf = (ownerId) => (ownerId==="p1" ? p2 : p1);
 
     for(let i=bullets.length-1;i>=0;i--){
@@ -434,7 +422,6 @@
       b.x += b.vx * dt;
       b.y += b.vy * dt;
 
-      // wall hit
       let hitWall=false;
       for(const w of world.walls){
         if(circleRectCollide(b.x,b.y,b.r,w)){ hitWall=true; break; }
@@ -444,21 +431,16 @@
         continue;
       }
 
-      // player hit
       const v = victimOf(b.owner);
-      const dist = Math.hypot(v.x - b.x, v.y - b.y);
-      if(dist <= v.r + b.r){
+      if(Math.hypot(v.x-b.x, v.y-b.y) <= v.r + b.r){
         v.hp = Math.max(0, v.hp - BULLET_DAMAGE);
         bullets.splice(i,1);
-        continue;
       }
     }
 
-    // HUD
     p1Bar.style.width = `${(p1.hp/maxHP)*100}%`;
     p2Bar.style.width = `${(p2.hp/maxHP)*100}%`;
 
-    // Win
     if(p1.hp<=0 || p2.hp<=0){
       running=false;
       win.style.display="flex";
@@ -474,7 +456,6 @@
     ctx.fillStyle="#0b0f14";
     ctx.fillRect(0,0,W,H);
 
-    // subtle dots
     ctx.globalAlpha=0.18;
     ctx.fillStyle="#b9c7dd";
     for(let y=80;y<H;y+=26){
@@ -482,7 +463,6 @@
     }
     ctx.globalAlpha=1;
 
-    // walls
     ctx.fillStyle="rgba(255,255,255,0.10)";
     ctx.strokeStyle="rgba(255,255,255,0.18)";
     for(const w of world.walls){
@@ -510,7 +490,6 @@
       ctx.lineWidth=2;
       ctx.stroke();
 
-      // aim line
       const d=p.lastAim;
       ctx.strokeStyle="rgba(255,255,255,0.35)";
       ctx.lineWidth=3;
@@ -528,7 +507,6 @@
     drawPlayer(p1);
     drawPlayer(p2);
 
-    // bullets
     ctx.fillStyle="rgba(255,255,255,0.85)";
     for(const b of bullets){
       ctx.beginPath();
@@ -545,7 +523,6 @@
     requestAnimationFrame(loop);
   }
 
-  // roundRect polyfill
   if(!CanvasRenderingContext2D.prototype.roundRect){
     CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
       r=Math.min(r,w/2,h/2);
@@ -562,7 +539,6 @@
 
   restart();
   requestAnimationFrame(loop);
-
   document.addEventListener('touchmove', (e)=>e.preventDefault(), {passive:false});
 })();
 </script>
