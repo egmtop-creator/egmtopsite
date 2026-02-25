@@ -1,139 +1,421 @@
-<!DOCTYPE html>
-<html>
+<!doctype html>
+<html lang="tr">
 <head>
-<meta charset="UTF-8">
-<title>Mobile 2P Shooter</title>
-<style>
-body { margin:0; overflow:hidden; background:#111; }
-canvas { background:#1e1e1e; display:block; margin:auto; }
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
+  <title>Mini Brawl 1v1 (TR)</title>
+  <style>
+    html, body { margin:0; padding:0; height:100%; background:#0b1220; overflow:hidden; touch-action:none; }
+    canvas { display:block; width:100vw; height:100vh; }
 
-.controls {
-    position: absolute;
-    bottom: 20px;
-    width: 100%;
-    display: flex;
-    justify-content: space-between;
-    padding: 0 40px;
-}
+    .hud {
+      position: fixed; left: 12px; top: 10px; right: 12px;
+      display:flex; gap:10px; align-items:center; justify-content:space-between;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color:#e8eefc; font-weight:700; user-select:none; pointer-events:none;
+      text-shadow: 0 2px 8px rgba(0,0,0,.6);
+    }
+    .barWrap { flex:1; max-width:48vw; }
+    .label { font-size:12px; opacity:.9; margin-bottom:6px; }
+    .bar {
+      height: 12px; border-radius: 999px; background: rgba(255,255,255,.12);
+      overflow:hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.5);
+    }
+    .fill { height:100%; width:100%; border-radius:999px; }
+    .fill.p1 { background: #4aa3ff; }
+    .fill.p2 { background: #ff4a6a; }
 
-.joystick {
-    width: 100px;
-    height: 100px;
-    background: rgba(255,255,255,0.1);
-    border-radius: 50%;
-    position: relative;
-}
+    .centerMsg {
+      position: fixed; left:50%; top:50%; transform:translate(-50%,-50%);
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color:#fff; text-align:center; font-weight:900;
+      padding: 12px 16px; border-radius: 14px;
+      background: rgba(0,0,0,.45); backdrop-filter: blur(6px);
+      box-shadow: 0 12px 40px rgba(0,0,0,.45);
+      display:none;
+    }
+    .centerMsg small { display:block; font-weight:700; opacity:.9; margin-top:6px; }
 
-.shoot {
-    width: 80px;
-    height: 80px;
-    background: red;
-    border-radius: 50%;
-    opacity: 0.7;
-}
-</style>
+    /* Joystick */
+    .joy {
+      position: fixed; width: 160px; height: 160px; border-radius: 999px;
+      background: rgba(255,255,255,.08);
+      border: 1px solid rgba(255,255,255,.12);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,.35);
+      bottom: 18px;
+      touch-action:none;
+    }
+    .joy.left { left: 18px; }
+    .joy.right { right: 18px; }
+
+    .joy .stick {
+      position:absolute; left:50%; top:50%;
+      width: 64px; height: 64px; border-radius: 999px;
+      transform: translate(-50%, -50%);
+      background: rgba(255,255,255,.18);
+      border: 1px solid rgba(255,255,255,.18);
+      box-shadow: 0 10px 24px rgba(0,0,0,.35);
+    }
+
+    .hint {
+      position: fixed; left: 18px; right: 18px; bottom: 190px;
+      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
+      color: rgba(255,255,255,.75);
+      font-size: 12px;
+      display:flex; justify-content:space-between;
+      pointer-events:none; user-select:none;
+    }
+  </style>
 </head>
 <body>
-
-<canvas id="game" width="900" height="500"></canvas>
-
-<div class="controls">
-    <div>
-        <div class="joystick" id="joy1"></div>
-        <div class="shoot" id="shoot1"></div>
+  <div class="hud">
+    <div class="barWrap">
+      <div class="label">P1 (Mavi) Can: <span id="hp1txt">100</span>/100</div>
+      <div class="bar"><div class="fill p1" id="hp1"></div></div>
     </div>
-    <div>
-        <div class="shoot" id="shoot2"></div>
-        <div class="joystick" id="joy2"></div>
+    <div class="barWrap" style="text-align:right">
+      <div class="label">P2 (Kırmızı) Can: <span id="hp2txt">100</span>/100</div>
+      <div class="bar"><div class="fill p2" id="hp2"></div></div>
     </div>
-</div>
+  </div>
+
+  <div class="centerMsg" id="msg"></div>
+
+  <div class="hint">
+    <div>Sol joystick: hareket</div>
+    <div>Sağ joystick: ateş</div>
+  </div>
+
+  <div class="joy left" id="joyMove"><div class="stick" id="stickMove"></div></div>
+  <div class="joy right" id="joyShoot"><div class="stick" id="stickShoot"></div></div>
+
+  <canvas id="c"></canvas>
 
 <script>
-const canvas = document.getElementById("game");
-const ctx = canvas.getContext("2d");
+(() => {
+  const canvas = document.getElementById('c');
+  const ctx = canvas.getContext('2d');
 
-let p1 = { x:50, y:200, size:25, hp:5 };
-let p2 = { x:825, y:200, size:25, hp:5 };
-let bullets = [];
+  const hp1Bar = document.getElementById('hp1');
+  const hp2Bar = document.getElementById('hp2');
+  const hp1Txt = document.getElementById('hp1txt');
+  const hp2Txt = document.getElementById('hp2txt');
+  const msgEl  = document.getElementById('msg');
 
-function shoot(player, dir){
+  function resize() {
+    const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
+    canvas.width  = Math.floor(innerWidth * dpr);
+    canvas.height = Math.floor(innerHeight * dpr);
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+  }
+  window.addEventListener('resize', resize);
+  resize();
+
+  const WORLD = { w: () => innerWidth, h: () => innerHeight, pad: 24 };
+
+  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
+  function norm(x,y){ const l = Math.hypot(x,y) || 1; return {x:x/l, y:y/l}; }
+
+  const obstacles = [];
+  function makeMap() {
+    obstacles.length = 0;
+    const W = WORLD.w(), H = WORLD.h();
+    const boxes = [
+      {x: W*0.5, y: H*0.5, w: 140, h: 90},
+      {x: W*0.25, y: H*0.45, w: 120, h: 70},
+      {x: W*0.75, y: H*0.55, w: 120, h: 70},
+      {x: W*0.5, y: H*0.25, w: 110, h: 60},
+      {x: W*0.5, y: H*0.75, w: 110, h: 60},
+    ];
+    for (const b of boxes) obstacles.push(b);
+  }
+  makeMap();
+  window.addEventListener('resize', makeMap);
+
+  const P = { r: 18, speed: 220, hpMax: 100 };
+
+  const p1 = { x: WORLD.w()*0.25, y: WORLD.h()*0.5, vx:0, vy:0, hp:P.hpMax, color:'#4aa3ff', lastShot: 0 };
+  const p2 = { x: WORLD.w()*0.75, y: WORLD.h()*0.5, vx:0, vy:0, hp:P.hpMax, color:'#ff4a6a', lastShot: 0 };
+
+  const bullets = [];
+  const BUL = { r: 5, speed: 520, ttl: 1.2, dmg: 12, cooldown: 0.18 };
+
+  let gameOver = false;
+
+  function rectCircleCollide(rx, ry, rw, rh, cx, cy, cr) {
+    const nx = clamp(cx, rx - rw/2, rx + rw/2);
+    const ny = clamp(cy, ry - rh/2, ry + rh/2);
+    const dx = cx - nx, dy = cy - ny;
+    return dx*dx + dy*dy <= cr*cr;
+  }
+
+  function pushOutOfRect(player, rect) {
+    if (!rectCircleCollide(rect.x, rect.y, rect.w, rect.h, player.x, player.y, P.r)) return;
+
+    const left   = (rect.x - rect.w/2) - (player.x + P.r);
+    const right  = (rect.x + rect.w/2) - (player.x - P.r);
+    const top    = (rect.y - rect.h/2) - (player.y + P.r);
+    const bottom = (rect.y + rect.h/2) - (player.y - P.r);
+
+    const candidates = [
+      {axis:'x', d:left},
+      {axis:'x', d:right},
+      {axis:'y', d:top},
+      {axis:'y', d:bottom},
+    ].sort((a,b)=>Math.abs(a.d)-Math.abs(b.d));
+
+    const c = candidates[0];
+    if (c.axis === 'x') player.x += c.d;
+    else player.y += c.d;
+  }
+
+  function keepInBounds(player) {
+    const W = WORLD.w(), H = WORLD.h(), pad = WORLD.pad;
+    player.x = clamp(player.x, pad + P.r, W - pad - P.r);
+    player.y = clamp(player.y, pad + P.r, H - pad - P.r);
+  }
+
+  function shoot(from, dirx, diry, now) {
+    if (gameOver) return;
+    if (now - from.lastShot < BUL.cooldown) return;
+
+    const d = norm(dirx, diry);
+    from.lastShot = now;
+
     bullets.push({
-        x: player.x + player.size/2,
-        y: player.y + player.size/2,
-        size:6,
-        speed:6*dir,
-        owner:player
+      x: from.x + d.x*(P.r + BUL.r + 2),
+      y: from.y + d.y*(P.r + BUL.r + 2),
+      vx: d.x * BUL.speed,
+      vy: d.y * BUL.speed,
+      ttl: BUL.ttl,
+      owner: from
     });
-}
+  }
 
-function update(){
-    ctx.clearRect(0,0,900,500);
+  function damage(player, amount) {
+    player.hp = Math.max(0, player.hp - amount);
+    if (player.hp <= 0 && !gameOver) {
+      gameOver = true;
+      const kazanan = (player === p1) ? "P2" : "P1";
+      msgEl.innerHTML = `${kazanan} kazandı! <small>Yeniden başlamak için ekrana dokun / Space</small>`;
+      msgEl.style.display = 'block';
+    }
+  }
 
-    ctx.fillStyle="orange";
-    ctx.fillRect(p1.x,p1.y,p1.size,p1.size);
+  function reset() {
+    p1.x = WORLD.w()*0.25; p1.y = WORLD.h()*0.5; p1.hp = P.hpMax; p1.lastShot = 0;
+    p2.x = WORLD.w()*0.75; p2.y = WORLD.h()*0.5; p2.hp = P.hpMax; p2.lastShot = 0;
+    bullets.length = 0;
+    gameOver = false;
+    msgEl.style.display = 'none';
+  }
 
-    ctx.fillStyle="cyan";
-    ctx.fillRect(p2.x,p2.y,p2.size,p2.size);
+  function makeJoystick(rootEl, stickEl) {
+    const state = { active:false, id:null, dx:0, dy:0, mag:0 };
+    const rect = () => rootEl.getBoundingClientRect();
 
-    ctx.fillStyle="yellow";
-    bullets.forEach((b,i)=>{
-        b.x += b.speed;
-        ctx.fillRect(b.x,b.y,b.size,b.size);
+    function resetStick() { stickEl.style.transform = `translate(-50%, -50%)`; }
+    function setStickPx(vx, vy) { stickEl.style.transform = `translate(${vx}px, ${vy}px) translate(-50%, -50%)`; }
 
-        let target = b.owner===p1 ? p2 : p1;
+    function updateFromPoint(x, y) {
+      const r = rect();
+      const cx = r.left + r.width/2;
+      const cy = r.top + r.height/2;
+      let vx = x - cx, vy = y - cy;
 
-        if(
-            b.x < target.x+target.size &&
-            b.x+b.size > target.x &&
-            b.y < target.y+target.size &&
-            b.y+b.size > target.y
-        ){
-            target.hp--;
-            bullets.splice(i,1);
-        }
+      const max = r.width * 0.32;
+      const m = Math.hypot(vx, vy);
+      if (m > max) { vx = vx / m * max; vy = vy / m * max; }
 
-        if(b.x<0 || b.x>900) bullets.splice(i,1);
-    });
-
-    ctx.fillStyle="white";
-    ctx.font="20px Arial";
-    ctx.fillText("P1: "+p1.hp,20,30);
-    ctx.fillText("P2: "+p2.hp,820,30);
-
-    if(p1.hp<=0 || p2.hp<=0){
-        ctx.font="40px Arial";
-        ctx.fillText(p1.hp<=0?"P2 WINS":"P1 WINS",350,250);
-        return;
+      state.dx = vx / max;
+      state.dy = vy / max;
+      state.mag = clamp(Math.hypot(state.dx, state.dy), 0, 1);
+      setStickPx(vx, vy);
     }
 
-    requestAnimationFrame(update);
-}
-
-update();
-
-// JOYSTICKS
-let joy1 = document.getElementById("joy1");
-let joy2 = document.getElementById("joy2");
-
-joy1.onmousedown = e=>{
-    document.onmousemove = ev=>{
-        if(ev.movementY < 0) p1.y -= 5;
-        if(ev.movementY > 0) p1.y += 5;
+    function onDown(e) {
+      const p = (e.changedTouches ? e.changedTouches[0] : e);
+      state.active = true;
+      state.id = p.identifier ?? 'mouse';
+      updateFromPoint(p.clientX, p.clientY);
+      e.preventDefault();
     }
-};
-joy2.onmousedown = e=>{
-    document.onmousemove = ev=>{
-        if(ev.movementY < 0) p2.y -= 5;
-        if(ev.movementY > 0) p2.y += 5;
+
+    function onMove(e) {
+      if (!state.active) return;
+      const list = e.changedTouches ? [...e.changedTouches] : [e];
+      const p = list.find(t => (t.identifier ?? 'mouse') === state.id);
+      if (!p) return;
+      updateFromPoint(p.clientX, p.clientY);
+      e.preventDefault();
     }
-};
-document.onmouseup = ()=> document.onmousemove = null;
 
-// SHOOT BUTTONS
-document.getElementById("shoot1").onclick = ()=> shoot(p1,1);
-document.getElementById("shoot2").onclick = ()=> shoot(p2,-1);
+    function onUp(e) {
+      if (!state.active) return;
+      const list = e.changedTouches ? [...e.changedTouches] : [e];
+      const p = list.find(t => (t.identifier ?? 'mouse') === state.id);
+      if (!p) return;
+      state.active = false;
+      state.id = null;
+      state.dx = state.dy = state.mag = 0;
+      resetStick();
+      e.preventDefault();
+    }
 
+    rootEl.addEventListener('touchstart', onDown, {passive:false});
+    rootEl.addEventListener('touchmove',  onMove, {passive:false});
+    rootEl.addEventListener('touchend',   onUp,   {passive:false});
+    rootEl.addEventListener('touchcancel',onUp,   {passive:false});
+
+    rootEl.addEventListener('mousedown', onDown);
+    window.addEventListener('mousemove', onMove);
+    window.addEventListener('mouseup', onUp);
+
+    return state;
+  }
+
+  const moveJoy  = makeJoystick(document.getElementById('joyMove'),  document.getElementById('stickMove'));
+  const shootJoy = makeJoystick(document.getElementById('joyShoot'), document.getElementById('stickShoot'));
+
+  let lastTime = performance.now();
+
+  window.addEventListener('keydown', (e) => { if (e.code === 'Space' && gameOver) reset(); });
+  window.addEventListener('pointerdown', () => { if (gameOver) reset(); });
+
+  function step(nowMs) {
+    const dt = Math.min(0.033, (nowMs - lastTime)/1000);
+    lastTime = nowMs;
+    const now = nowMs/1000;
+
+    // P1 hareket
+    p1.vx = moveJoy.dx * P.speed;
+    p1.vy = moveJoy.dy * P.speed;
+    p1.x += p1.vx * dt;
+    p1.y += p1.vy * dt;
+    keepInBounds(p1);
+    for (const o of obstacles) pushOutOfRect(p1, o);
+
+    // P1 ateş
+    if (shootJoy.mag > 0.25) shoot(p1, shootJoy.dx, shootJoy.dy, now);
+
+    // Bot (P2)
+    if (!gameOver) {
+      const dx = p1.x - p2.x, dy = p1.y - p2.y;
+      const d = Math.hypot(dx, dy);
+      const desired = norm(dx, dy);
+      const tooClose = d < 160;
+      const chaseSpeed = tooClose ? -140 : 170;
+
+      p2.vx = desired.x * chaseSpeed;
+      p2.vy = desired.y * chaseSpeed;
+
+      const wig = Math.sin(nowMs/220) * 0.35;
+      p2.vx += -desired.y * 80 * wig;
+      p2.vy +=  desired.x * 80 * wig;
+
+      p2.x += p2.vx * dt;
+      p2.y += p2.vy * dt;
+      keepInBounds(p2);
+      for (const o of obstacles) pushOutOfRect(p2, o);
+
+      const canShoot = d < 520 && d > 90;
+      if (canShoot && Math.random() < 0.035) shoot(p2, dx, dy, now);
+    }
+
+    // Mermiler
+    for (let i = bullets.length - 1; i >= 0; i--) {
+      const b = bullets[i];
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+      b.ttl -= dt;
+
+      if (b.x < WORLD.pad || b.x > WORLD.w() - WORLD.pad || b.y < WORLD.pad || b.y > WORLD.h() - WORLD.pad) {
+        bullets.splice(i,1); continue;
+      }
+
+      let hitObs = false;
+      for (const o of obstacles) {
+        if (rectCircleCollide(o.x,o.y,o.w,o.h, b.x,b.y, BUL.r)) { hitObs = true; break; }
+      }
+      if (hitObs) { bullets.splice(i,1); continue; }
+
+      const target = (b.owner === p1) ? p2 : p1;
+      const ddx = target.x - b.x, ddy = target.y - b.y;
+      if (ddx*ddx + ddy*ddy <= (P.r + BUL.r)*(P.r + BUL.r)) {
+        damage(target, BUL.dmg);
+        bullets.splice(i,1); continue;
+      }
+
+      if (b.ttl <= 0) bullets.splice(i,1);
+    }
+
+    // HUD
+    hp1Txt.textContent = p1.hp;
+    hp2Txt.textContent = p2.hp;
+    hp1Bar.style.width = (p1.hp/P.hpMax*100).toFixed(1) + '%';
+    hp2Bar.style.width = (p2.hp/P.hpMax*100).toFixed(1) + '%';
+
+    render(nowMs);
+    requestAnimationFrame(step);
+  }
+
+  function render(nowMs) {
+    const W = WORLD.w(), H = WORLD.h();
+    ctx.clearRect(0,0,W,H);
+    ctx.fillStyle = '#0b1220';
+    ctx.fillRect(0,0,W,H);
+
+    ctx.strokeStyle = 'rgba(255,255,255,.10)';
+    ctx.lineWidth = 3;
+    ctx.strokeRect(WORLD.pad, WORLD.pad, W - WORLD.pad*2, H - WORLD.pad*2);
+
+    for (const o of obstacles) {
+      ctx.fillStyle = 'rgba(255,255,255,.08)';
+      ctx.fillRect(o.x - o.w/2, o.y - o.h/2, o.w, o.h);
+      ctx.strokeStyle = 'rgba(255,255,255,.12)';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(o.x - o.w/2, o.y - o.h/2, o.w, o.h);
+    }
+
+    drawPlayer(p1);
+    drawPlayer(p2);
+
+    for (const b of bullets) {
+      ctx.beginPath();
+      ctx.fillStyle = 'rgba(255,255,255,.92)';
+      ctx.arc(b.x, b.y, BUL.r, 0, Math.PI*2);
+      ctx.fill();
+    }
+
+    if (shootJoy.mag > 0.2 && !gameOver) {
+      const d = norm(shootJoy.dx, shootJoy.dy);
+      ctx.strokeStyle = 'rgba(74,163,255,.35)';
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(p1.x, p1.y);
+      ctx.lineTo(p1.x + d.x*90, p1.y + d.y*90);
+      ctx.stroke();
+    }
+  }
+
+  function drawPlayer(p) {
+    ctx.beginPath();
+    ctx.fillStyle = p.color;
+    ctx.arc(p.x, p.y, P.r, 0, Math.PI*2);
+    ctx.fill();
+
+    ctx.strokeStyle = 'rgba(0,0,0,.35)';
+    ctx.lineWidth = 3;
+    ctx.stroke();
+
+    ctx.beginPath();
+    ctx.fillStyle = 'rgba(0,0,0,.25)';
+    ctx.arc(p.x + 6, p.y - 4, 3, 0, Math.PI*2);
+    ctx.fill();
+  }
+
+  requestAnimationFrame(step);
+})();
 </script>
-
 </body>
 </html>
