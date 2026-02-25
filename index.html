@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
-  <title>1v1 Mini Brawl (Joystick)</title>
+  <title>1v1 Mini Brawl (Hızlı + Ateş)</title>
   <style>
     html, body { margin:0; padding:0; height:100%; background:#0b0f14; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
     #wrap { position:relative; width:100%; height:100%; overflow:hidden; touch-action:none; }
@@ -66,7 +66,6 @@
       line-height: 1.35;
     }
 
-    /* Joystick UI */
     .joyZone { position:absolute; bottom: 18px; width: 44vw; height: 44vw; max-width: 260px; max-height: 260px; min-width: 170px; min-height: 170px; opacity: 0.95; }
     .leftZone { left: 14px; }
     .rightZone { right: 14px; }
@@ -127,11 +126,11 @@
   <canvas id="c"></canvas>
 
   <div class="hud">
-    <div class="box" id="p1Hud">
+    <div class="box">
       Oyuncu 1 (Mavi) • Can
       <div class="bar"><div id="p1Bar"></div></div>
     </div>
-    <div class="box" id="p2Hud" style="text-align:right;">
+    <div class="box" style="text-align:right;">
       Oyuncu 2 (Kırmızı) • Can
       <div class="bar"><div id="p2Bar"></div></div>
     </div>
@@ -139,53 +138,35 @@
 
   <div class="centerTop">
     <button class="btn" id="restartBtn">Yeniden Başlat</button>
-    <div style="opacity:.9; font-weight:800;">1v1 Mini Brawl</div>
+    <div style="opacity:.9; font-weight:800;">1v1 Mini Brawl • Ateş</div>
   </div>
 
-  <div class="tip" id="tip">
-    <b>Kontrol:</b> Sol joystick = hareket. Sağ joystick = saldırı yönü (dürtme).
-    <br/>Yakın dövüş: Menzile girince hasar verir. Duvarlara çarpınca durursun.
+  <div class="tip">
+    <b>Kontrol:</b> Sol joystick = hareket. Sağ joystick = ateş yönü (basılı tut = seri ateş).
+    <br/>Duvarlar mermiyi bloklar. Bot yok: 2 oyuncu aynı cihazda oynar.
   </div>
 
-  <!-- Player 1 zones (left half) -->
+  <!-- Player 1 -->
   <div class="joyZone leftZone" id="p1MoveZone">
-    <div class="joy">
-      <div class="label">Oyuncu 1 • Hareket</div>
-      <div class="base"></div>
-      <div class="stick" id="p1MoveStick"></div>
-    </div>
+    <div class="joy"><div class="label">Oyuncu 1 • Hareket</div><div class="base"></div><div class="stick" id="p1MoveStick"></div></div>
   </div>
   <div class="joyZone leftZone" style="bottom: calc(18px + min(44vw,260px) + 14px);" id="p1AtkZone">
-    <div class="joy">
-      <div class="label">Oyuncu 1 • Saldırı</div>
-      <div class="base"></div>
-      <div class="stick" id="p1AtkStick"></div>
-    </div>
+    <div class="joy"><div class="label">Oyuncu 1 • Ateş</div><div class="base"></div><div class="stick" id="p1AtkStick"></div></div>
   </div>
 
-  <!-- Player 2 zones (right half) -->
+  <!-- Player 2 -->
   <div class="joyZone rightZone" id="p2MoveZone">
-    <div class="joy">
-      <div class="label">Oyuncu 2 • Hareket</div>
-      <div class="base"></div>
-      <div class="stick" id="p2MoveStick"></div>
-    </div>
+    <div class="joy"><div class="label">Oyuncu 2 • Hareket</div><div class="base"></div><div class="stick" id="p2MoveStick"></div></div>
   </div>
   <div class="joyZone rightZone" style="bottom: calc(18px + min(44vw,260px) + 14px);" id="p2AtkZone">
-    <div class="joy">
-      <div class="label">Oyuncu 2 • Saldırı</div>
-      <div class="base"></div>
-      <div class="stick" id="p2AtkStick"></div>
-    </div>
+    <div class="joy"><div class="label">Oyuncu 2 • Ateş</div><div class="base"></div><div class="stick" id="p2AtkStick"></div></div>
   </div>
 
   <div class="win" id="win">
     <div class="panel">
-      <h1 id="winTitle">Kazanan: Oyuncu ?</h1>
-      <p id="winDesc">Yeniden oynamak için butona bas.</p>
-      <div class="row">
-        <button class="btn" id="restartBtn2">Yeniden Başlat</button>
-      </div>
+      <h1 id="winTitle">Kazanan</h1>
+      <p>Tekrar oynamak için yeniden başlat.</p>
+      <div class="row"><button class="btn" id="restartBtn2">Yeniden Başlat</button></div>
     </div>
   </div>
 </div>
@@ -212,440 +193,377 @@
   const ro = new ResizeObserver(fit);
   ro.observe(document.getElementById('wrap'));
 
-  // World
-  const world = {
-    w: () => canvas.clientWidth,
-    h: () => canvas.clientHeight,
-    walls: [],
-  };
+  // Helpers
+  const clamp = (v,a,b)=>Math.max(a,Math.min(b,v));
+  const norm = (x,y)=>{ const L=Math.hypot(x,y)||1; return {x:x/L,y:y/L}; };
 
-  function makeArena() {
-    const W = world.w(), H = world.h();
-    // Simple walls (rectangles): x,y,w,h
-    const pad = 30;
-    world.walls = [
-      {x: pad, y: pad+60, w: W - pad*2, h: 14},               // top bar-ish
-      {x: pad, y: H - pad - 14, w: W - pad*2, h: 14},        // bottom
-      {x: pad, y: pad+60, w: 14, h: H - (pad+60) - (pad+14)},// left
-      {x: W - pad - 14, y: pad+60, w: 14, h: H - (pad+60) - (pad+14)}, // right
-      // middle obstacles
-      {x: W*0.5 - 90, y: H*0.45, w: 180, h: 16},
-      {x: W*0.25 - 60, y: H*0.62, w: 120, h: 16},
-      {x: W*0.75 - 60, y: H*0.62, w: 120, h: 16},
-      {x: W*0.5 - 8, y: H*0.25, w: 16, h: 120},
-    ];
-  }
-
-  // Utility
-  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-  const len = (x,y) => Math.hypot(x,y);
-  const norm = (x,y) => {
-    const L = Math.hypot(x,y) || 1;
-    return {x: x/L, y: y/L};
-  };
-
+  // Collision
   function circleRectCollide(cx, cy, r, rect) {
-    const rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
+    const rx=rect.x, ry=rect.y, rw=rect.w, rh=rect.h;
     const closestX = clamp(cx, rx, rx + rw);
     const closestY = clamp(cy, ry, ry + rh);
     const dx = cx - closestX, dy = cy - closestY;
     return (dx*dx + dy*dy) <= r*r;
   }
-
-  function resolveCircleRect(player, rect) {
-    // Push out minimal axis (simple approach)
-    const cx = player.x, cy = player.y, r = player.r;
-    const rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
-
+  function resolveCircleRect(p, rect) {
+    const cx=p.x, cy=p.y, r=p.r;
+    const rx=rect.x, ry=rect.y, rw=rect.w, rh=rect.h;
     const closestX = clamp(cx, rx, rx + rw);
     const closestY = clamp(cy, ry, ry + rh);
     let dx = cx - closestX, dy = cy - closestY;
-    const dist = Math.hypot(dx, dy) || 0.0001;
-
+    const dist = Math.hypot(dx,dy) || 0.0001;
     if (dist < r) {
       const push = (r - dist);
-      dx /= dist; dy /= dist;
-      player.x += dx * push;
-      player.y += dy * push;
-      // damp velocity on collision
-      player.vx *= 0.3;
-      player.vy *= 0.3;
+      dx/=dist; dy/=dist;
+      p.x += dx*push; p.y += dy*push;
+      p.vx *= 0.35; p.vy *= 0.35;
     }
   }
 
-  function circleCircleHit(a, b, r) {
-    return Math.hypot(a.x - b.x, a.y - b.y) <= r;
-  }
-
-  // Players
-  const maxHP = 100;
-  const players = {
-    p1: null,
-    p2: null
+  // World
+  const world = {
+    w: ()=>canvas.clientWidth,
+    h: ()=>canvas.clientHeight,
+    walls: []
   };
 
-  function resetPlayers() {
+  function makeArena() {
     const W = world.w(), H = world.h();
-    players.p1 = {
-      id: "p1",
-      name: "Oyuncu 1",
-      x: W*0.30, y: H*0.35,
-      vx: 0, vy: 0,
-      r: 18,
-      hp: maxHP,
-      move: {x:0, y:0},
-      atk: {x:0, y:0},
-      lastAtkDir: {x:1, y:0},
-      atkCooldown: 0,
-      color: "rgba(90,170,255,0.95)"
-    };
-    players.p2 = {
-      id: "p2",
-      name: "Oyuncu 2",
-      x: W*0.70, y: H*0.35,
-      vx: 0, vy: 0,
-      r: 18,
-      hp: maxHP,
-      move: {x:0, y:0},
-      atk: {x:0, y:0},
-      lastAtkDir: {x:-1, y:0},
-      atkCooldown: 0,
-      color: "rgba(255,110,110,0.95)"
-    };
-    win.style.display = "none";
+    const pad = 30;
+    world.walls = [
+      {x: pad, y: pad+60, w: W - pad*2, h: 14},
+      {x: pad, y: H - pad - 14, w: W - pad*2, h: 14},
+      {x: pad, y: pad+60, w: 14, h: H - (pad+60) - (pad+14)},
+      {x: W - pad - 14, y: pad+60, w: 14, h: H - (pad+60) - (pad+14)},
+      {x: W*0.5 - 100, y: H*0.45, w: 200, h: 16},
+      {x: W*0.25 - 70, y: H*0.62, w: 140, h: 16},
+      {x: W*0.75 - 70, y: H*0.62, w: 140, h: 16},
+      {x: W*0.5 - 8, y: H*0.25, w: 16, h: 130},
+    ];
   }
 
-  // Joystick implementation
-  function makeJoystick(zoneEl, stickEl, onVector) {
-    const state = {
-      active: false,
-      pid: null,
-      centerX: 0,
-      centerY: 0,
-      vecX: 0,
-      vecY: 0,
-      maxR: 0
+  // Players + bullets
+  const maxHP = 100;
+
+  const players = { p1:null, p2:null };
+  let bullets = []; // {x,y,vx,vy,r,owner,life}
+
+  function resetPlayers() {
+    const W=world.w(), H=world.h();
+    bullets = [];
+    players.p1 = {
+      id:"p1", name:"Oyuncu 1",
+      x: W*0.30, y: H*0.35, vx:0, vy:0, r:18, hp:maxHP,
+      move:{x:0,y:0}, atk:{x:0,y:0}, lastAim:{x:1,y:0},
+      shootCd:0,
+      color:"rgba(90,170,255,0.95)"
     };
+    players.p2 = {
+      id:"p2", name:"Oyuncu 2",
+      x: W*0.70, y: H*0.35, vx:0, vy:0, r:18, hp:maxHP,
+      move:{x:0,y:0}, atk:{x:0,y:0}, lastAim:{x:-1,y:0},
+      shootCd:0,
+      color:"rgba(255,110,110,0.95)"
+    };
+    win.style.display="none";
+  }
 
-    function getZoneRect() { return zoneEl.getBoundingClientRect(); }
+  // JOYSTICK
+  function makeJoystick(zoneEl, stickEl, onVector) {
+    const state = { active:false, pid:null };
 
-    function setStick(vx, vy) {
-      // move stick relative to center; stickEl is absolutely positioned at center via transform
-      // We'll apply translate offsets by CSS translate.
-      const rect = getZoneRect();
-      const size = Math.min(rect.width, rect.height);
-      const maxR = size * 0.28; // max radius for stick movement
-      state.maxR = maxR;
+    function rect(){ return zoneEl.getBoundingClientRect(); }
 
+    function setStick(vx,vy){
+      const r = rect();
+      const maxR = Math.min(r.width,r.height) * 0.28;
       const px = vx * maxR;
       const py = vy * maxR;
       stickEl.style.transform = `translate(calc(-50% + ${px}px), calc(-50% + ${py}px))`;
     }
 
-    function updateFromPoint(clientX, clientY) {
-      const rect = getZoneRect();
-      const cx = rect.left + rect.width/2;
-      const cy = rect.top + rect.height/2;
+    function update(clientX, clientY){
+      const r = rect();
+      const cx = r.left + r.width/2;
+      const cy = r.top + r.height/2;
 
       let dx = clientX - cx;
       let dy = clientY - cy;
 
-      const max = Math.min(rect.width, rect.height) * 0.35;
-      const d = Math.hypot(dx, dy);
+      const max = Math.min(r.width,r.height) * 0.35;
+      const d = Math.hypot(dx,dy);
 
-      if (d > max) {
-        dx = dx / d * max;
-        dy = dy / d * max;
-      }
+      if (d > max) { dx = dx/d*max; dy = dy/d*max; }
 
-      const vx = dx / max;
-      const vy = dy / max;
+      const vx = dx/max;
+      const vy = dy/max;
 
-      state.vecX = vx;
-      state.vecY = vy;
-
-      setStick(vx, vy);
-      onVector(vx, vy);
+      setStick(vx,vy);
+      onVector(vx,vy);
     }
 
-    function end() {
-      state.active = false;
-      state.pid = null;
-      state.vecX = 0; state.vecY = 0;
+    function end(){
+      state.active=false; state.pid=null;
       stickEl.style.transform = `translate(-50%, -50%)`;
       onVector(0,0);
     }
 
-    zoneEl.addEventListener('pointerdown', (e) => {
+    zoneEl.addEventListener('pointerdown', (e)=>{
       e.preventDefault();
       zoneEl.setPointerCapture(e.pointerId);
-      state.active = true;
-      state.pid = e.pointerId;
-      updateFromPoint(e.clientX, e.clientY);
+      state.active=true; state.pid=e.pointerId;
+      update(e.clientX, e.clientY);
     }, {passive:false});
 
-    zoneEl.addEventListener('pointermove', (e) => {
-      if (!state.active || e.pointerId !== state.pid) return;
+    zoneEl.addEventListener('pointermove', (e)=>{
+      if(!state.active || e.pointerId!==state.pid) return;
       e.preventDefault();
-      updateFromPoint(e.clientX, e.clientY);
+      update(e.clientX, e.clientY);
     }, {passive:false});
 
-    zoneEl.addEventListener('pointerup', (e) => {
-      if (e.pointerId !== state.pid) return;
+    zoneEl.addEventListener('pointerup', (e)=>{
+      if(e.pointerId!==state.pid) return;
       e.preventDefault();
       end();
     }, {passive:false});
 
-    zoneEl.addEventListener('pointercancel', (e) => {
-      if (e.pointerId !== state.pid) return;
+    zoneEl.addEventListener('pointercancel', (e)=>{
+      if(e.pointerId!==state.pid) return;
       end();
     });
 
     return { end };
   }
 
-  // Hook joysticks to players
-  const p1MoveJoy = makeJoystick(
-    document.getElementById('p1MoveZone'),
-    document.getElementById('p1MoveStick'),
-    (x,y) => { if (players.p1) players.p1.move = {x,y}; }
+  makeJoystick(document.getElementById('p1MoveZone'), document.getElementById('p1MoveStick'),
+    (x,y)=>{ if(players.p1) players.p1.move={x,y}; }
   );
-  const p1AtkJoy = makeJoystick(
-    document.getElementById('p1AtkZone'),
-    document.getElementById('p1AtkStick'),
-    (x,y) => { if (players.p1) players.p1.atk = {x,y}; }
+  makeJoystick(document.getElementById('p1AtkZone'), document.getElementById('p1AtkStick'),
+    (x,y)=>{ if(players.p1) players.p1.atk={x,y}; }
   );
-  const p2MoveJoy = makeJoystick(
-    document.getElementById('p2MoveZone'),
-    document.getElementById('p2MoveStick'),
-    (x,y) => { if (players.p2) players.p2.move = {x,y}; }
+  makeJoystick(document.getElementById('p2MoveZone'), document.getElementById('p2MoveStick'),
+    (x,y)=>{ if(players.p2) players.p2.move={x,y}; }
   );
-  const p2AtkJoy = makeJoystick(
-    document.getElementById('p2AtkZone'),
-    document.getElementById('p2AtkStick'),
-    (x,y) => { if (players.p2) players.p2.atk = {x,y}; }
+  makeJoystick(document.getElementById('p2AtkZone'), document.getElementById('p2AtkStick'),
+    (x,y)=>{ if(players.p2) players.p2.atk={x,y}; }
   );
 
-  // Gameplay tuning
-  const SPEED = 260;        // px/s
-  const FRICTION = 10.5;    // damping
-  const ATK_RANGE = 44;     // hit radius around attacker
-  const ATK_DAMAGE = 16;
-  const ATK_COOLDOWN = 0.22; // seconds
-  const ATK_KNOCK = 260;
+  // ======= НАСТРОЙКИ СКОРОСТИ/СТРЕЛЬБЫ (сделал быстрее) =======
+  const SPEED = 420;        // было медленно -> быстрее
+  const FRICTION = 7.5;     // меньше трения -> быстрее разгон/движение
+  const BULLET_SPEED = 820; // скорость пули
+  const BULLET_DAMAGE = 10; // урон
+  const BULLET_CD = 0.09;   // скорострельность (меньше = быстрее)
+  const BULLET_LIFE = 1.2;  // сек
+  const BULLET_R = 4;
+
+  function spawnBullet(shooter, dir) {
+    const muzzle = shooter.r + 14;
+    bullets.push({
+      x: shooter.x + dir.x * muzzle,
+      y: shooter.y + dir.y * muzzle,
+      vx: dir.x * BULLET_SPEED,
+      vy: dir.y * BULLET_SPEED,
+      r: BULLET_R,
+      owner: shooter.id,
+      life: BULLET_LIFE
+    });
+  }
 
   let lastTs = performance.now();
   let running = true;
 
-  function restart() {
+  function restart(){
     makeArena();
     resetPlayers();
     running = true;
   }
-
   restartBtn.addEventListener('click', restart);
   restartBtn2.addEventListener('click', restart);
 
-  function update(dt) {
-    const p1 = players.p1, p2 = players.p2;
-    if (!p1 || !p2) return;
+  function update(dt){
+    const p1=players.p1, p2=players.p2;
+    if(!p1 || !p2) return;
 
-    // Move: acceleration-like
-    for (const p of [p1, p2]) {
-      // Movement vector
-      const mv = p.move;
-      const mvLen = Math.hypot(mv.x, mv.y);
-      let mx = mv.x, my = mv.y;
-      if (mvLen > 1) { mx /= mvLen; my /= mvLen; }
-
+    // Movement
+    for(const p of [p1,p2]){
+      let mx=p.move.x, my=p.move.y;
+      const L=Math.hypot(mx,my);
+      if(L>1){ mx/=L; my/=L; }
       p.vx += mx * SPEED * dt;
       p.vy += my * SPEED * dt;
 
-      // friction
       p.vx -= p.vx * Math.min(1, FRICTION * dt);
       p.vy -= p.vy * Math.min(1, FRICTION * dt);
 
       p.x += p.vx * dt;
       p.y += p.vy * dt;
 
-      // Arena collision
-      for (const w of world.walls) {
-        if (circleRectCollide(p.x, p.y, p.r, w)) {
-          resolveCircleRect(p, w);
-        }
+      for(const w of world.walls){
+        if(circleRectCollide(p.x,p.y,p.r,w)) resolveCircleRect(p,w);
       }
 
-      // keep in bounds (extra safety)
-      p.x = clamp(p.x, p.r, world.w() - p.r);
-      p.y = clamp(p.y, p.r + 60, world.h() - p.r);
+      p.x = clamp(p.x, p.r, world.w()-p.r);
+      p.y = clamp(p.y, p.r+60, world.h()-p.r);
     }
 
-    // Attack direction and triggering: if atk joystick pushed beyond threshold, we "stab" repeatedly with cooldown
-    function handleAttack(attacker, victim) {
-      attacker.atkCooldown = Math.max(0, attacker.atkCooldown - dt);
+    // Shooting (hold attack joystick)
+    function handleShoot(shooter){
+      shooter.shootCd = Math.max(0, shooter.shootCd - dt);
+      const ax=shooter.atk.x, ay=shooter.atk.y;
+      const aLen=Math.hypot(ax,ay);
 
-      const ax = attacker.atk.x, ay = attacker.atk.y;
-      const aLen = Math.hypot(ax, ay);
-
-      if (aLen > 0.18) {
-        const d = norm(ax, ay);
-        attacker.lastAtkDir = d;
-
-        if (attacker.atkCooldown === 0) {
-          // Attack: a short-range hit check in front of attacker
-          // We'll use a point "tip" ahead, plus a radius check for forgiving hitbox
-          const tipDist = attacker.r + 18;
-          const tipX = attacker.x + d.x * tipDist;
-          const tipY = attacker.y + d.y * tipDist;
-
-          const hit = (Math.hypot(victim.x - tipX, victim.y - tipY) <= (victim.r + 16))
-                   || (Math.hypot(victim.x - attacker.x, victim.y - attacker.y) <= ATK_RANGE);
-
-          if (hit) {
-            victim.hp = Math.max(0, victim.hp - ATK_DAMAGE);
-
-            // Knockback victim away from attacker
-            const away = norm(victim.x - attacker.x, victim.y - attacker.y);
-            victim.vx += away.x * ATK_KNOCK;
-            victim.vy += away.y * ATK_KNOCK;
-          }
-
-          attacker.atkCooldown = ATK_COOLDOWN;
+      if(aLen > 0.18){
+        const d = norm(ax,ay);
+        shooter.lastAim = d;
+        if(shooter.shootCd === 0){
+          spawnBullet(shooter, d);
+          shooter.shootCd = BULLET_CD;
         }
       }
     }
+    handleShoot(p1);
+    handleShoot(p2);
 
-    handleAttack(p1, p2);
-    handleAttack(p2, p1);
+    // Bullets update + collisions
+    const victimOf = (ownerId) => (ownerId==="p1" ? p2 : p1);
 
-    // Update HUD
-    p1Bar.style.width = `${(p1.hp / maxHP) * 100}%`;
-    p2Bar.style.width = `${(p2.hp / maxHP) * 100}%`;
+    for(let i=bullets.length-1;i>=0;i--){
+      const b=bullets[i];
+      b.life -= dt;
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
 
-    // Win condition
-    if (p1.hp <= 0 || p2.hp <= 0) {
-      running = false;
-      win.style.display = "flex";
-      if (p1.hp <= 0 && p2.hp <= 0) winTitle.textContent = "Berabere!";
-      else if (p1.hp <= 0) winTitle.textContent = "Kazanan: Oyuncu 2 (Kırmızı)";
-      else winTitle.textContent = "Kazanan: Oyuncu 1 (Mavi)";
+      // wall hit
+      let hitWall=false;
+      for(const w of world.walls){
+        if(circleRectCollide(b.x,b.y,b.r,w)){ hitWall=true; break; }
+      }
+      if(hitWall || b.life<=0){
+        bullets.splice(i,1);
+        continue;
+      }
+
+      // player hit
+      const v = victimOf(b.owner);
+      const dist = Math.hypot(v.x - b.x, v.y - b.y);
+      if(dist <= v.r + b.r){
+        v.hp = Math.max(0, v.hp - BULLET_DAMAGE);
+        bullets.splice(i,1);
+        continue;
+      }
+    }
+
+    // HUD
+    p1Bar.style.width = `${(p1.hp/maxHP)*100}%`;
+    p2Bar.style.width = `${(p2.hp/maxHP)*100}%`;
+
+    // Win
+    if(p1.hp<=0 || p2.hp<=0){
+      running=false;
+      win.style.display="flex";
+      if(p1.hp<=0 && p2.hp<=0) winTitle.textContent="Berabere!";
+      else if(p1.hp<=0) winTitle.textContent="Kazanan: Oyuncu 2 (Kırmızı)";
+      else winTitle.textContent="Kazanan: Oyuncu 1 (Mavi)";
     }
   }
 
-  function draw() {
-    const W = world.w(), H = world.h();
+  function draw(){
+    const W=world.w(), H=world.h();
     ctx.clearRect(0,0,W,H);
-
-    // Background grid-ish
-    ctx.fillStyle = "#0b0f14";
+    ctx.fillStyle="#0b0f14";
     ctx.fillRect(0,0,W,H);
 
     // subtle dots
-    ctx.globalAlpha = 0.18;
-    ctx.fillStyle = "#b9c7dd";
-    for (let y=80; y<H; y+=28) {
-      for (let x=18; x<W; x+=28) {
-        ctx.fillRect(x, y, 1, 1);
-      }
+    ctx.globalAlpha=0.18;
+    ctx.fillStyle="#b9c7dd";
+    for(let y=80;y<H;y+=26){
+      for(let x=18;x<W;x+=26) ctx.fillRect(x,y,1,1);
     }
-    ctx.globalAlpha = 1;
+    ctx.globalAlpha=1;
 
-    // Walls
-    ctx.fillStyle = "rgba(255,255,255,0.10)";
-    ctx.strokeStyle = "rgba(255,255,255,0.18)";
-    for (const w of world.walls) {
+    // walls
+    ctx.fillStyle="rgba(255,255,255,0.10)";
+    ctx.strokeStyle="rgba(255,255,255,0.18)";
+    for(const w of world.walls){
       ctx.beginPath();
-      ctx.roundRect(w.x, w.y, w.w, w.h, 8);
+      ctx.roundRect(w.x,w.y,w.w,w.h,8);
       ctx.fill();
       ctx.stroke();
     }
 
-    // Players
-    const p1 = players.p1, p2 = players.p2;
-    if (!p1 || !p2) return;
+    const p1=players.p1, p2=players.p2;
+    if(!p1||!p2) return;
 
-    function drawPlayer(p) {
-      // shadow
-      ctx.fillStyle = "rgba(0,0,0,0.35)";
+    function drawPlayer(p){
+      ctx.fillStyle="rgba(0,0,0,0.35)";
       ctx.beginPath();
       ctx.ellipse(p.x, p.y + p.r + 10, p.r*1.05, p.r*0.42, 0, 0, Math.PI*2);
       ctx.fill();
 
-      // body
-      ctx.fillStyle = p.color;
+      ctx.fillStyle=p.color;
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
       ctx.fill();
 
-      // outline
-      ctx.strokeStyle = "rgba(255,255,255,0.22)";
-      ctx.lineWidth = 2;
+      ctx.strokeStyle="rgba(255,255,255,0.22)";
+      ctx.lineWidth=2;
       ctx.stroke();
 
-      // facing/attack indicator
-      const d = p.lastAtkDir;
-      ctx.strokeStyle = "rgba(255,255,255,0.35)";
-      ctx.lineWidth = 3;
+      // aim line
+      const d=p.lastAim;
+      ctx.strokeStyle="rgba(255,255,255,0.35)";
+      ctx.lineWidth=3;
       ctx.beginPath();
-      ctx.moveTo(p.x, p.y);
-      ctx.lineTo(p.x + d.x*(p.r+16), p.y + d.y*(p.r+16));
+      ctx.moveTo(p.x,p.y);
+      ctx.lineTo(p.x + d.x*(p.r+18), p.y + d.y*(p.r+18));
       ctx.stroke();
 
-      // name
-      ctx.fillStyle = "rgba(232,238,247,0.9)";
-      ctx.font = "700 12px system-ui";
-      ctx.textAlign = "center";
+      ctx.fillStyle="rgba(232,238,247,0.9)";
+      ctx.font="700 12px system-ui";
+      ctx.textAlign="center";
       ctx.fillText(p.name, p.x, p.y - p.r - 12);
     }
 
     drawPlayer(p1);
     drawPlayer(p2);
 
-    // Attack cooldown rings (visual)
-    function drawCooldown(p) {
-      const cd = p.atkCooldown / ATK_COOLDOWN;
-      if (cd <= 0) return;
-      ctx.strokeStyle = "rgba(255,255,255,0.25)";
-      ctx.lineWidth = 4;
+    // bullets
+    ctx.fillStyle="rgba(255,255,255,0.85)";
+    for(const b of bullets){
       ctx.beginPath();
-      ctx.arc(p.x, p.y, p.r + 10, -Math.PI/2, -Math.PI/2 + (Math.PI*2)*cd);
-      ctx.stroke();
+      ctx.arc(b.x,b.y,b.r,0,Math.PI*2);
+      ctx.fill();
     }
-    drawCooldown(p1);
-    drawCooldown(p2);
   }
 
-  function loop(ts) {
-    const dt = Math.min(0.033, (ts - lastTs) / 1000);
+  function loop(ts){
+    const dt = Math.min(0.033, (ts-lastTs)/1000);
     lastTs = ts;
-
-    if (running) update(dt);
+    if(running) update(dt);
     draw();
-
     requestAnimationFrame(loop);
   }
 
-  // Ensure roundRect exists (older browsers)
-  if (!CanvasRenderingContext2D.prototype.roundRect) {
-    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
-      r = Math.min(r, w/2, h/2);
+  // roundRect polyfill
+  if(!CanvasRenderingContext2D.prototype.roundRect){
+    CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){
+      r=Math.min(r,w/2,h/2);
       this.beginPath();
-      this.moveTo(x+r, y);
-      this.arcTo(x+w, y, x+w, y+h, r);
-      this.arcTo(x+w, y+h, x, y+h, r);
-      this.arcTo(x, y+h, x, y, r);
-      this.arcTo(x, y, x+w, y, r);
+      this.moveTo(x+r,y);
+      this.arcTo(x+w,y,x+w,y+h,r);
+      this.arcTo(x+w,y+h,x,y+h,r);
+      this.arcTo(x,y+h,x,y,r);
+      this.arcTo(x,y,x+w,y,r);
       this.closePath();
       return this;
     };
   }
 
-  // Start
   restart();
   requestAnimationFrame(loop);
 
-  // Prevent page scroll on touch
-  document.addEventListener('touchmove', (e) => e.preventDefault(), {passive:false});
+  document.addEventListener('touchmove', (e)=>e.preventDefault(), {passive:false});
 })();
 </script>
 </body>
