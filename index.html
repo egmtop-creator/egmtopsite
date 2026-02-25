@@ -1,420 +1,651 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="tr">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no"/>
-  <title>Mini Brawl 1v1 (TR)</title>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no" />
+  <title>1v1 Mini Brawl (Joystick)</title>
   <style>
-    html, body { margin:0; padding:0; height:100%; background:#0b1220; overflow:hidden; touch-action:none; }
-    canvas { display:block; width:100vw; height:100vh; }
+    html, body { margin:0; padding:0; height:100%; background:#0b0f14; font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial; }
+    #wrap { position:relative; width:100%; height:100%; overflow:hidden; touch-action:none; }
+    canvas { display:block; width:100%; height:100%; }
 
     .hud {
-      position: fixed; left: 12px; top: 10px; right: 12px;
-      display:flex; gap:10px; align-items:center; justify-content:space-between;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      color:#e8eefc; font-weight:700; user-select:none; pointer-events:none;
-      text-shadow: 0 2px 8px rgba(0,0,0,.6);
+      position:absolute; left:0; right:0; top:0;
+      display:flex; justify-content:space-between; gap:12px;
+      padding:10px 12px;
+      color:#e8eef7; font-weight:700; font-size:14px;
+      pointer-events:none;
+      text-shadow: 0 2px 8px rgba(0,0,0,.5);
     }
-    .barWrap { flex:1; max-width:48vw; }
-    .label { font-size:12px; opacity:.9; margin-bottom:6px; }
+    .hud .box {
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 12px;
+      padding: 8px 10px;
+      min-width: 140px;
+    }
     .bar {
-      height: 12px; border-radius: 999px; background: rgba(255,255,255,.12);
-      overflow:hidden; box-shadow: inset 0 1px 2px rgba(0,0,0,.5);
+      height:10px; border-radius:999px; background: rgba(255,255,255,0.12);
+      overflow:hidden; margin-top:6px;
     }
-    .fill { height:100%; width:100%; border-radius:999px; }
-    .fill.p1 { background: #4aa3ff; }
-    .fill.p2 { background: #ff4a6a; }
+    .bar > div { height:100%; width:100%; background: rgba(90,220,140,0.95); }
 
-    .centerMsg {
-      position: fixed; left:50%; top:50%; transform:translate(-50%,-50%);
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      color:#fff; text-align:center; font-weight:900;
-      padding: 12px 16px; border-radius: 14px;
-      background: rgba(0,0,0,.45); backdrop-filter: blur(6px);
-      box-shadow: 0 12px 40px rgba(0,0,0,.45);
-      display:none;
+    .centerTop {
+      position:absolute; top:10px; left:50%; transform:translateX(-50%);
+      display:flex; align-items:center; gap:10px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 8px 10px;
+      color:#e8eef7;
+      backdrop-filter: blur(6px);
     }
-    .centerMsg small { display:block; font-weight:700; opacity:.9; margin-top:6px; }
+    .btn {
+      pointer-events:auto;
+      border:0;
+      border-radius: 12px;
+      padding: 8px 10px;
+      font-weight: 800;
+      background: rgba(255,255,255,0.14);
+      color: #e8eef7;
+      cursor:pointer;
+    }
+    .btn:active { transform: translateY(1px); }
 
-    /* Joystick */
+    .tip {
+      pointer-events:none;
+      position:absolute; left:50%; bottom: 140px; transform:translateX(-50%);
+      color: rgba(232,238,247,0.92);
+      font-size: 13px;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      padding: 10px 12px;
+      max-width: min(680px, calc(100% - 24px));
+      text-align:center;
+      line-height: 1.35;
+    }
+
+    /* Joystick UI */
+    .joyZone { position:absolute; bottom: 18px; width: 44vw; height: 44vw; max-width: 260px; max-height: 260px; min-width: 170px; min-height: 170px; opacity: 0.95; }
+    .leftZone { left: 14px; }
+    .rightZone { right: 14px; }
+
     .joy {
-      position: fixed; width: 160px; height: 160px; border-radius: 999px;
-      background: rgba(255,255,255,.08);
-      border: 1px solid rgba(255,255,255,.12);
-      box-shadow: inset 0 2px 8px rgba(0,0,0,.35);
-      bottom: 18px;
-      touch-action:none;
+      position:absolute; inset:0;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.12);
+      backdrop-filter: blur(6px);
     }
-    .joy.left { left: 18px; }
-    .joy.right { right: 18px; }
-
+    .joy .label {
+      position:absolute; left:50%; top: 8px; transform: translateX(-50%);
+      font-size: 12px; font-weight: 800; color: rgba(232,238,247,0.85);
+      letter-spacing: 0.2px;
+    }
+    .joy .base {
+      position:absolute; left:50%; top:50%;
+      width: 70%; height: 70%;
+      transform: translate(-50%,-50%);
+      border-radius: 50%;
+      background: rgba(255,255,255,0.04);
+      border: 1px solid rgba(255,255,255,0.10);
+    }
     .joy .stick {
       position:absolute; left:50%; top:50%;
-      width: 64px; height: 64px; border-radius: 999px;
-      transform: translate(-50%, -50%);
-      background: rgba(255,255,255,.18);
-      border: 1px solid rgba(255,255,255,.18);
-      box-shadow: 0 10px 24px rgba(0,0,0,.35);
+      width: 34%; height: 34%;
+      transform: translate(-50%,-50%);
+      border-radius: 50%;
+      background: rgba(255,255,255,0.16);
+      border: 1px solid rgba(255,255,255,0.18);
+      box-shadow: 0 10px 30px rgba(0,0,0,0.35);
     }
 
-    .hint {
-      position: fixed; left: 18px; right: 18px; bottom: 190px;
-      font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial;
-      color: rgba(255,255,255,.75);
-      font-size: 12px;
-      display:flex; justify-content:space-between;
-      pointer-events:none; user-select:none;
+    .win {
+      position:absolute; inset:0;
+      display:none; align-items:center; justify-content:center;
+      background: rgba(0,0,0,0.55);
+      color: #e8eef7;
+      text-align:center;
+      padding: 24px;
     }
+    .win .panel {
+      width: min(520px, 92vw);
+      background: rgba(255,255,255,0.06);
+      border: 1px solid rgba(255,255,255,0.14);
+      border-radius: 18px;
+      padding: 18px 16px;
+      backdrop-filter: blur(8px);
+    }
+    .win h1 { margin: 4px 0 10px; font-size: 22px; }
+    .win p { margin: 0 0 14px; opacity: 0.9; }
+    .row { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
   </style>
 </head>
 <body>
-  <div class="hud">
-    <div class="barWrap">
-      <div class="label">P1 (Mavi) Can: <span id="hp1txt">100</span>/100</div>
-      <div class="bar"><div class="fill p1" id="hp1"></div></div>
-    </div>
-    <div class="barWrap" style="text-align:right">
-      <div class="label">P2 (Kırmızı) Can: <span id="hp2txt">100</span>/100</div>
-      <div class="bar"><div class="fill p2" id="hp2"></div></div>
-    </div>
-  </div>
-
-  <div class="centerMsg" id="msg"></div>
-
-  <div class="hint">
-    <div>Sol joystick: hareket</div>
-    <div>Sağ joystick: ateş</div>
-  </div>
-
-  <div class="joy left" id="joyMove"><div class="stick" id="stickMove"></div></div>
-  <div class="joy right" id="joyShoot"><div class="stick" id="stickShoot"></div></div>
-
+<div id="wrap">
   <canvas id="c"></canvas>
+
+  <div class="hud">
+    <div class="box" id="p1Hud">
+      Oyuncu 1 (Mavi) • Can
+      <div class="bar"><div id="p1Bar"></div></div>
+    </div>
+    <div class="box" id="p2Hud" style="text-align:right;">
+      Oyuncu 2 (Kırmızı) • Can
+      <div class="bar"><div id="p2Bar"></div></div>
+    </div>
+  </div>
+
+  <div class="centerTop">
+    <button class="btn" id="restartBtn">Yeniden Başlat</button>
+    <div style="opacity:.9; font-weight:800;">1v1 Mini Brawl</div>
+  </div>
+
+  <div class="tip" id="tip">
+    <b>Kontrol:</b> Sol joystick = hareket. Sağ joystick = saldırı yönü (dürtme).
+    <br/>Yakın dövüş: Menzile girince hasar verir. Duvarlara çarpınca durursun.
+  </div>
+
+  <!-- Player 1 zones (left half) -->
+  <div class="joyZone leftZone" id="p1MoveZone">
+    <div class="joy">
+      <div class="label">Oyuncu 1 • Hareket</div>
+      <div class="base"></div>
+      <div class="stick" id="p1MoveStick"></div>
+    </div>
+  </div>
+  <div class="joyZone leftZone" style="bottom: calc(18px + min(44vw,260px) + 14px);" id="p1AtkZone">
+    <div class="joy">
+      <div class="label">Oyuncu 1 • Saldırı</div>
+      <div class="base"></div>
+      <div class="stick" id="p1AtkStick"></div>
+    </div>
+  </div>
+
+  <!-- Player 2 zones (right half) -->
+  <div class="joyZone rightZone" id="p2MoveZone">
+    <div class="joy">
+      <div class="label">Oyuncu 2 • Hareket</div>
+      <div class="base"></div>
+      <div class="stick" id="p2MoveStick"></div>
+    </div>
+  </div>
+  <div class="joyZone rightZone" style="bottom: calc(18px + min(44vw,260px) + 14px);" id="p2AtkZone">
+    <div class="joy">
+      <div class="label">Oyuncu 2 • Saldırı</div>
+      <div class="base"></div>
+      <div class="stick" id="p2AtkStick"></div>
+    </div>
+  </div>
+
+  <div class="win" id="win">
+    <div class="panel">
+      <h1 id="winTitle">Kazanan: Oyuncu ?</h1>
+      <p id="winDesc">Yeniden oynamak için butona bas.</p>
+      <div class="row">
+        <button class="btn" id="restartBtn2">Yeniden Başlat</button>
+      </div>
+    </div>
+  </div>
+</div>
 
 <script>
 (() => {
   const canvas = document.getElementById('c');
   const ctx = canvas.getContext('2d');
 
-  const hp1Bar = document.getElementById('hp1');
-  const hp2Bar = document.getElementById('hp2');
-  const hp1Txt = document.getElementById('hp1txt');
-  const hp2Txt = document.getElementById('hp2txt');
-  const msgEl  = document.getElementById('msg');
+  const p1Bar = document.getElementById('p1Bar');
+  const p2Bar = document.getElementById('p2Bar');
+  const restartBtn = document.getElementById('restartBtn');
+  const restartBtn2 = document.getElementById('restartBtn2');
+  const win = document.getElementById('win');
+  const winTitle = document.getElementById('winTitle');
 
-  function resize() {
+  // Resize
+  function fit() {
     const dpr = Math.max(1, Math.min(2, window.devicePixelRatio || 1));
-    canvas.width  = Math.floor(innerWidth * dpr);
-    canvas.height = Math.floor(innerHeight * dpr);
-    ctx.setTransform(dpr,0,0,dpr,0,0);
+    canvas.width = Math.floor(canvas.clientWidth * dpr);
+    canvas.height = Math.floor(canvas.clientHeight * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  window.addEventListener('resize', resize);
-  resize();
+  const ro = new ResizeObserver(fit);
+  ro.observe(document.getElementById('wrap'));
 
-  const WORLD = { w: () => innerWidth, h: () => innerHeight, pad: 24 };
+  // World
+  const world = {
+    w: () => canvas.clientWidth,
+    h: () => canvas.clientHeight,
+    walls: [],
+  };
 
-  function clamp(v, a, b) { return Math.max(a, Math.min(b, v)); }
-  function norm(x,y){ const l = Math.hypot(x,y) || 1; return {x:x/l, y:y/l}; }
-
-  const obstacles = [];
-  function makeMap() {
-    obstacles.length = 0;
-    const W = WORLD.w(), H = WORLD.h();
-    const boxes = [
-      {x: W*0.5, y: H*0.5, w: 140, h: 90},
-      {x: W*0.25, y: H*0.45, w: 120, h: 70},
-      {x: W*0.75, y: H*0.55, w: 120, h: 70},
-      {x: W*0.5, y: H*0.25, w: 110, h: 60},
-      {x: W*0.5, y: H*0.75, w: 110, h: 60},
+  function makeArena() {
+    const W = world.w(), H = world.h();
+    // Simple walls (rectangles): x,y,w,h
+    const pad = 30;
+    world.walls = [
+      {x: pad, y: pad+60, w: W - pad*2, h: 14},               // top bar-ish
+      {x: pad, y: H - pad - 14, w: W - pad*2, h: 14},        // bottom
+      {x: pad, y: pad+60, w: 14, h: H - (pad+60) - (pad+14)},// left
+      {x: W - pad - 14, y: pad+60, w: 14, h: H - (pad+60) - (pad+14)}, // right
+      // middle obstacles
+      {x: W*0.5 - 90, y: H*0.45, w: 180, h: 16},
+      {x: W*0.25 - 60, y: H*0.62, w: 120, h: 16},
+      {x: W*0.75 - 60, y: H*0.62, w: 120, h: 16},
+      {x: W*0.5 - 8, y: H*0.25, w: 16, h: 120},
     ];
-    for (const b of boxes) obstacles.push(b);
-  }
-  makeMap();
-  window.addEventListener('resize', makeMap);
-
-  const P = { r: 18, speed: 220, hpMax: 100 };
-
-  const p1 = { x: WORLD.w()*0.25, y: WORLD.h()*0.5, vx:0, vy:0, hp:P.hpMax, color:'#4aa3ff', lastShot: 0 };
-  const p2 = { x: WORLD.w()*0.75, y: WORLD.h()*0.5, vx:0, vy:0, hp:P.hpMax, color:'#ff4a6a', lastShot: 0 };
-
-  const bullets = [];
-  const BUL = { r: 5, speed: 520, ttl: 1.2, dmg: 12, cooldown: 0.18 };
-
-  let gameOver = false;
-
-  function rectCircleCollide(rx, ry, rw, rh, cx, cy, cr) {
-    const nx = clamp(cx, rx - rw/2, rx + rw/2);
-    const ny = clamp(cy, ry - rh/2, ry + rh/2);
-    const dx = cx - nx, dy = cy - ny;
-    return dx*dx + dy*dy <= cr*cr;
   }
 
-  function pushOutOfRect(player, rect) {
-    if (!rectCircleCollide(rect.x, rect.y, rect.w, rect.h, player.x, player.y, P.r)) return;
+  // Utility
+  const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  const len = (x,y) => Math.hypot(x,y);
+  const norm = (x,y) => {
+    const L = Math.hypot(x,y) || 1;
+    return {x: x/L, y: y/L};
+  };
 
-    const left   = (rect.x - rect.w/2) - (player.x + P.r);
-    const right  = (rect.x + rect.w/2) - (player.x - P.r);
-    const top    = (rect.y - rect.h/2) - (player.y + P.r);
-    const bottom = (rect.y + rect.h/2) - (player.y - P.r);
-
-    const candidates = [
-      {axis:'x', d:left},
-      {axis:'x', d:right},
-      {axis:'y', d:top},
-      {axis:'y', d:bottom},
-    ].sort((a,b)=>Math.abs(a.d)-Math.abs(b.d));
-
-    const c = candidates[0];
-    if (c.axis === 'x') player.x += c.d;
-    else player.y += c.d;
+  function circleRectCollide(cx, cy, r, rect) {
+    const rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
+    const closestX = clamp(cx, rx, rx + rw);
+    const closestY = clamp(cy, ry, ry + rh);
+    const dx = cx - closestX, dy = cy - closestY;
+    return (dx*dx + dy*dy) <= r*r;
   }
 
-  function keepInBounds(player) {
-    const W = WORLD.w(), H = WORLD.h(), pad = WORLD.pad;
-    player.x = clamp(player.x, pad + P.r, W - pad - P.r);
-    player.y = clamp(player.y, pad + P.r, H - pad - P.r);
-  }
+  function resolveCircleRect(player, rect) {
+    // Push out minimal axis (simple approach)
+    const cx = player.x, cy = player.y, r = player.r;
+    const rx = rect.x, ry = rect.y, rw = rect.w, rh = rect.h;
 
-  function shoot(from, dirx, diry, now) {
-    if (gameOver) return;
-    if (now - from.lastShot < BUL.cooldown) return;
+    const closestX = clamp(cx, rx, rx + rw);
+    const closestY = clamp(cy, ry, ry + rh);
+    let dx = cx - closestX, dy = cy - closestY;
+    const dist = Math.hypot(dx, dy) || 0.0001;
 
-    const d = norm(dirx, diry);
-    from.lastShot = now;
-
-    bullets.push({
-      x: from.x + d.x*(P.r + BUL.r + 2),
-      y: from.y + d.y*(P.r + BUL.r + 2),
-      vx: d.x * BUL.speed,
-      vy: d.y * BUL.speed,
-      ttl: BUL.ttl,
-      owner: from
-    });
-  }
-
-  function damage(player, amount) {
-    player.hp = Math.max(0, player.hp - amount);
-    if (player.hp <= 0 && !gameOver) {
-      gameOver = true;
-      const kazanan = (player === p1) ? "P2" : "P1";
-      msgEl.innerHTML = `${kazanan} kazandı! <small>Yeniden başlamak için ekrana dokun / Space</small>`;
-      msgEl.style.display = 'block';
+    if (dist < r) {
+      const push = (r - dist);
+      dx /= dist; dy /= dist;
+      player.x += dx * push;
+      player.y += dy * push;
+      // damp velocity on collision
+      player.vx *= 0.3;
+      player.vy *= 0.3;
     }
   }
 
-  function reset() {
-    p1.x = WORLD.w()*0.25; p1.y = WORLD.h()*0.5; p1.hp = P.hpMax; p1.lastShot = 0;
-    p2.x = WORLD.w()*0.75; p2.y = WORLD.h()*0.5; p2.hp = P.hpMax; p2.lastShot = 0;
-    bullets.length = 0;
-    gameOver = false;
-    msgEl.style.display = 'none';
+  function circleCircleHit(a, b, r) {
+    return Math.hypot(a.x - b.x, a.y - b.y) <= r;
   }
 
-  function makeJoystick(rootEl, stickEl) {
-    const state = { active:false, id:null, dx:0, dy:0, mag:0 };
-    const rect = () => rootEl.getBoundingClientRect();
+  // Players
+  const maxHP = 100;
+  const players = {
+    p1: null,
+    p2: null
+  };
 
-    function resetStick() { stickEl.style.transform = `translate(-50%, -50%)`; }
-    function setStickPx(vx, vy) { stickEl.style.transform = `translate(${vx}px, ${vy}px) translate(-50%, -50%)`; }
-
-    function updateFromPoint(x, y) {
-      const r = rect();
-      const cx = r.left + r.width/2;
-      const cy = r.top + r.height/2;
-      let vx = x - cx, vy = y - cy;
-
-      const max = r.width * 0.32;
-      const m = Math.hypot(vx, vy);
-      if (m > max) { vx = vx / m * max; vy = vy / m * max; }
-
-      state.dx = vx / max;
-      state.dy = vy / max;
-      state.mag = clamp(Math.hypot(state.dx, state.dy), 0, 1);
-      setStickPx(vx, vy);
-    }
-
-    function onDown(e) {
-      const p = (e.changedTouches ? e.changedTouches[0] : e);
-      state.active = true;
-      state.id = p.identifier ?? 'mouse';
-      updateFromPoint(p.clientX, p.clientY);
-      e.preventDefault();
-    }
-
-    function onMove(e) {
-      if (!state.active) return;
-      const list = e.changedTouches ? [...e.changedTouches] : [e];
-      const p = list.find(t => (t.identifier ?? 'mouse') === state.id);
-      if (!p) return;
-      updateFromPoint(p.clientX, p.clientY);
-      e.preventDefault();
-    }
-
-    function onUp(e) {
-      if (!state.active) return;
-      const list = e.changedTouches ? [...e.changedTouches] : [e];
-      const p = list.find(t => (t.identifier ?? 'mouse') === state.id);
-      if (!p) return;
-      state.active = false;
-      state.id = null;
-      state.dx = state.dy = state.mag = 0;
-      resetStick();
-      e.preventDefault();
-    }
-
-    rootEl.addEventListener('touchstart', onDown, {passive:false});
-    rootEl.addEventListener('touchmove',  onMove, {passive:false});
-    rootEl.addEventListener('touchend',   onUp,   {passive:false});
-    rootEl.addEventListener('touchcancel',onUp,   {passive:false});
-
-    rootEl.addEventListener('mousedown', onDown);
-    window.addEventListener('mousemove', onMove);
-    window.addEventListener('mouseup', onUp);
-
-    return state;
+  function resetPlayers() {
+    const W = world.w(), H = world.h();
+    players.p1 = {
+      id: "p1",
+      name: "Oyuncu 1",
+      x: W*0.30, y: H*0.35,
+      vx: 0, vy: 0,
+      r: 18,
+      hp: maxHP,
+      move: {x:0, y:0},
+      atk: {x:0, y:0},
+      lastAtkDir: {x:1, y:0},
+      atkCooldown: 0,
+      color: "rgba(90,170,255,0.95)"
+    };
+    players.p2 = {
+      id: "p2",
+      name: "Oyuncu 2",
+      x: W*0.70, y: H*0.35,
+      vx: 0, vy: 0,
+      r: 18,
+      hp: maxHP,
+      move: {x:0, y:0},
+      atk: {x:0, y:0},
+      lastAtkDir: {x:-1, y:0},
+      atkCooldown: 0,
+      color: "rgba(255,110,110,0.95)"
+    };
+    win.style.display = "none";
   }
 
-  const moveJoy  = makeJoystick(document.getElementById('joyMove'),  document.getElementById('stickMove'));
-  const shootJoy = makeJoystick(document.getElementById('joyShoot'), document.getElementById('stickShoot'));
+  // Joystick implementation
+  function makeJoystick(zoneEl, stickEl, onVector) {
+    const state = {
+      active: false,
+      pid: null,
+      centerX: 0,
+      centerY: 0,
+      vecX: 0,
+      vecY: 0,
+      maxR: 0
+    };
 
-  let lastTime = performance.now();
+    function getZoneRect() { return zoneEl.getBoundingClientRect(); }
 
-  window.addEventListener('keydown', (e) => { if (e.code === 'Space' && gameOver) reset(); });
-  window.addEventListener('pointerdown', () => { if (gameOver) reset(); });
+    function setStick(vx, vy) {
+      // move stick relative to center; stickEl is absolutely positioned at center via transform
+      // We'll apply translate offsets by CSS translate.
+      const rect = getZoneRect();
+      const size = Math.min(rect.width, rect.height);
+      const maxR = size * 0.28; // max radius for stick movement
+      state.maxR = maxR;
 
-  function step(nowMs) {
-    const dt = Math.min(0.033, (nowMs - lastTime)/1000);
-    lastTime = nowMs;
-    const now = nowMs/1000;
+      const px = vx * maxR;
+      const py = vy * maxR;
+      stickEl.style.transform = `translate(calc(-50% + ${px}px), calc(-50% + ${py}px))`;
+    }
 
-    // P1 hareket
-    p1.vx = moveJoy.dx * P.speed;
-    p1.vy = moveJoy.dy * P.speed;
-    p1.x += p1.vx * dt;
-    p1.y += p1.vy * dt;
-    keepInBounds(p1);
-    for (const o of obstacles) pushOutOfRect(p1, o);
+    function updateFromPoint(clientX, clientY) {
+      const rect = getZoneRect();
+      const cx = rect.left + rect.width/2;
+      const cy = rect.top + rect.height/2;
 
-    // P1 ateş
-    if (shootJoy.mag > 0.25) shoot(p1, shootJoy.dx, shootJoy.dy, now);
+      let dx = clientX - cx;
+      let dy = clientY - cy;
 
-    // Bot (P2)
-    if (!gameOver) {
-      const dx = p1.x - p2.x, dy = p1.y - p2.y;
+      const max = Math.min(rect.width, rect.height) * 0.35;
       const d = Math.hypot(dx, dy);
-      const desired = norm(dx, dy);
-      const tooClose = d < 160;
-      const chaseSpeed = tooClose ? -140 : 170;
 
-      p2.vx = desired.x * chaseSpeed;
-      p2.vy = desired.y * chaseSpeed;
+      if (d > max) {
+        dx = dx / d * max;
+        dy = dy / d * max;
+      }
 
-      const wig = Math.sin(nowMs/220) * 0.35;
-      p2.vx += -desired.y * 80 * wig;
-      p2.vy +=  desired.x * 80 * wig;
+      const vx = dx / max;
+      const vy = dy / max;
 
-      p2.x += p2.vx * dt;
-      p2.y += p2.vy * dt;
-      keepInBounds(p2);
-      for (const o of obstacles) pushOutOfRect(p2, o);
+      state.vecX = vx;
+      state.vecY = vy;
 
-      const canShoot = d < 520 && d > 90;
-      if (canShoot && Math.random() < 0.035) shoot(p2, dx, dy, now);
+      setStick(vx, vy);
+      onVector(vx, vy);
     }
 
-    // Mermiler
-    for (let i = bullets.length - 1; i >= 0; i--) {
-      const b = bullets[i];
-      b.x += b.vx * dt;
-      b.y += b.vy * dt;
-      b.ttl -= dt;
-
-      if (b.x < WORLD.pad || b.x > WORLD.w() - WORLD.pad || b.y < WORLD.pad || b.y > WORLD.h() - WORLD.pad) {
-        bullets.splice(i,1); continue;
-      }
-
-      let hitObs = false;
-      for (const o of obstacles) {
-        if (rectCircleCollide(o.x,o.y,o.w,o.h, b.x,b.y, BUL.r)) { hitObs = true; break; }
-      }
-      if (hitObs) { bullets.splice(i,1); continue; }
-
-      const target = (b.owner === p1) ? p2 : p1;
-      const ddx = target.x - b.x, ddy = target.y - b.y;
-      if (ddx*ddx + ddy*ddy <= (P.r + BUL.r)*(P.r + BUL.r)) {
-        damage(target, BUL.dmg);
-        bullets.splice(i,1); continue;
-      }
-
-      if (b.ttl <= 0) bullets.splice(i,1);
+    function end() {
+      state.active = false;
+      state.pid = null;
+      state.vecX = 0; state.vecY = 0;
+      stickEl.style.transform = `translate(-50%, -50%)`;
+      onVector(0,0);
     }
 
-    // HUD
-    hp1Txt.textContent = p1.hp;
-    hp2Txt.textContent = p2.hp;
-    hp1Bar.style.width = (p1.hp/P.hpMax*100).toFixed(1) + '%';
-    hp2Bar.style.width = (p2.hp/P.hpMax*100).toFixed(1) + '%';
+    zoneEl.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      zoneEl.setPointerCapture(e.pointerId);
+      state.active = true;
+      state.pid = e.pointerId;
+      updateFromPoint(e.clientX, e.clientY);
+    }, {passive:false});
 
-    render(nowMs);
-    requestAnimationFrame(step);
+    zoneEl.addEventListener('pointermove', (e) => {
+      if (!state.active || e.pointerId !== state.pid) return;
+      e.preventDefault();
+      updateFromPoint(e.clientX, e.clientY);
+    }, {passive:false});
+
+    zoneEl.addEventListener('pointerup', (e) => {
+      if (e.pointerId !== state.pid) return;
+      e.preventDefault();
+      end();
+    }, {passive:false});
+
+    zoneEl.addEventListener('pointercancel', (e) => {
+      if (e.pointerId !== state.pid) return;
+      end();
+    });
+
+    return { end };
   }
 
-  function render(nowMs) {
-    const W = WORLD.w(), H = WORLD.h();
+  // Hook joysticks to players
+  const p1MoveJoy = makeJoystick(
+    document.getElementById('p1MoveZone'),
+    document.getElementById('p1MoveStick'),
+    (x,y) => { if (players.p1) players.p1.move = {x,y}; }
+  );
+  const p1AtkJoy = makeJoystick(
+    document.getElementById('p1AtkZone'),
+    document.getElementById('p1AtkStick'),
+    (x,y) => { if (players.p1) players.p1.atk = {x,y}; }
+  );
+  const p2MoveJoy = makeJoystick(
+    document.getElementById('p2MoveZone'),
+    document.getElementById('p2MoveStick'),
+    (x,y) => { if (players.p2) players.p2.move = {x,y}; }
+  );
+  const p2AtkJoy = makeJoystick(
+    document.getElementById('p2AtkZone'),
+    document.getElementById('p2AtkStick'),
+    (x,y) => { if (players.p2) players.p2.atk = {x,y}; }
+  );
+
+  // Gameplay tuning
+  const SPEED = 260;        // px/s
+  const FRICTION = 10.5;    // damping
+  const ATK_RANGE = 44;     // hit radius around attacker
+  const ATK_DAMAGE = 16;
+  const ATK_COOLDOWN = 0.22; // seconds
+  const ATK_KNOCK = 260;
+
+  let lastTs = performance.now();
+  let running = true;
+
+  function restart() {
+    makeArena();
+    resetPlayers();
+    running = true;
+  }
+
+  restartBtn.addEventListener('click', restart);
+  restartBtn2.addEventListener('click', restart);
+
+  function update(dt) {
+    const p1 = players.p1, p2 = players.p2;
+    if (!p1 || !p2) return;
+
+    // Move: acceleration-like
+    for (const p of [p1, p2]) {
+      // Movement vector
+      const mv = p.move;
+      const mvLen = Math.hypot(mv.x, mv.y);
+      let mx = mv.x, my = mv.y;
+      if (mvLen > 1) { mx /= mvLen; my /= mvLen; }
+
+      p.vx += mx * SPEED * dt;
+      p.vy += my * SPEED * dt;
+
+      // friction
+      p.vx -= p.vx * Math.min(1, FRICTION * dt);
+      p.vy -= p.vy * Math.min(1, FRICTION * dt);
+
+      p.x += p.vx * dt;
+      p.y += p.vy * dt;
+
+      // Arena collision
+      for (const w of world.walls) {
+        if (circleRectCollide(p.x, p.y, p.r, w)) {
+          resolveCircleRect(p, w);
+        }
+      }
+
+      // keep in bounds (extra safety)
+      p.x = clamp(p.x, p.r, world.w() - p.r);
+      p.y = clamp(p.y, p.r + 60, world.h() - p.r);
+    }
+
+    // Attack direction and triggering: if atk joystick pushed beyond threshold, we "stab" repeatedly with cooldown
+    function handleAttack(attacker, victim) {
+      attacker.atkCooldown = Math.max(0, attacker.atkCooldown - dt);
+
+      const ax = attacker.atk.x, ay = attacker.atk.y;
+      const aLen = Math.hypot(ax, ay);
+
+      if (aLen > 0.18) {
+        const d = norm(ax, ay);
+        attacker.lastAtkDir = d;
+
+        if (attacker.atkCooldown === 0) {
+          // Attack: a short-range hit check in front of attacker
+          // We'll use a point "tip" ahead, plus a radius check for forgiving hitbox
+          const tipDist = attacker.r + 18;
+          const tipX = attacker.x + d.x * tipDist;
+          const tipY = attacker.y + d.y * tipDist;
+
+          const hit = (Math.hypot(victim.x - tipX, victim.y - tipY) <= (victim.r + 16))
+                   || (Math.hypot(victim.x - attacker.x, victim.y - attacker.y) <= ATK_RANGE);
+
+          if (hit) {
+            victim.hp = Math.max(0, victim.hp - ATK_DAMAGE);
+
+            // Knockback victim away from attacker
+            const away = norm(victim.x - attacker.x, victim.y - attacker.y);
+            victim.vx += away.x * ATK_KNOCK;
+            victim.vy += away.y * ATK_KNOCK;
+          }
+
+          attacker.atkCooldown = ATK_COOLDOWN;
+        }
+      }
+    }
+
+    handleAttack(p1, p2);
+    handleAttack(p2, p1);
+
+    // Update HUD
+    p1Bar.style.width = `${(p1.hp / maxHP) * 100}%`;
+    p2Bar.style.width = `${(p2.hp / maxHP) * 100}%`;
+
+    // Win condition
+    if (p1.hp <= 0 || p2.hp <= 0) {
+      running = false;
+      win.style.display = "flex";
+      if (p1.hp <= 0 && p2.hp <= 0) winTitle.textContent = "Berabere!";
+      else if (p1.hp <= 0) winTitle.textContent = "Kazanan: Oyuncu 2 (Kırmızı)";
+      else winTitle.textContent = "Kazanan: Oyuncu 1 (Mavi)";
+    }
+  }
+
+  function draw() {
+    const W = world.w(), H = world.h();
     ctx.clearRect(0,0,W,H);
-    ctx.fillStyle = '#0b1220';
+
+    // Background grid-ish
+    ctx.fillStyle = "#0b0f14";
     ctx.fillRect(0,0,W,H);
 
-    ctx.strokeStyle = 'rgba(255,255,255,.10)';
-    ctx.lineWidth = 3;
-    ctx.strokeRect(WORLD.pad, WORLD.pad, W - WORLD.pad*2, H - WORLD.pad*2);
+    // subtle dots
+    ctx.globalAlpha = 0.18;
+    ctx.fillStyle = "#b9c7dd";
+    for (let y=80; y<H; y+=28) {
+      for (let x=18; x<W; x+=28) {
+        ctx.fillRect(x, y, 1, 1);
+      }
+    }
+    ctx.globalAlpha = 1;
 
-    for (const o of obstacles) {
-      ctx.fillStyle = 'rgba(255,255,255,.08)';
-      ctx.fillRect(o.x - o.w/2, o.y - o.h/2, o.w, o.h);
-      ctx.strokeStyle = 'rgba(255,255,255,.12)';
+    // Walls
+    ctx.fillStyle = "rgba(255,255,255,0.10)";
+    ctx.strokeStyle = "rgba(255,255,255,0.18)";
+    for (const w of world.walls) {
+      ctx.beginPath();
+      ctx.roundRect(w.x, w.y, w.w, w.h, 8);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    // Players
+    const p1 = players.p1, p2 = players.p2;
+    if (!p1 || !p2) return;
+
+    function drawPlayer(p) {
+      // shadow
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.beginPath();
+      ctx.ellipse(p.x, p.y + p.r + 10, p.r*1.05, p.r*0.42, 0, 0, Math.PI*2);
+      ctx.fill();
+
+      // body
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.r, 0, Math.PI*2);
+      ctx.fill();
+
+      // outline
+      ctx.strokeStyle = "rgba(255,255,255,0.22)";
       ctx.lineWidth = 2;
-      ctx.strokeRect(o.x - o.w/2, o.y - o.h/2, o.w, o.h);
+      ctx.stroke();
+
+      // facing/attack indicator
+      const d = p.lastAtkDir;
+      ctx.strokeStyle = "rgba(255,255,255,0.35)";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(p.x, p.y);
+      ctx.lineTo(p.x + d.x*(p.r+16), p.y + d.y*(p.r+16));
+      ctx.stroke();
+
+      // name
+      ctx.fillStyle = "rgba(232,238,247,0.9)";
+      ctx.font = "700 12px system-ui";
+      ctx.textAlign = "center";
+      ctx.fillText(p.name, p.x, p.y - p.r - 12);
     }
 
     drawPlayer(p1);
     drawPlayer(p2);
 
-    for (const b of bullets) {
+    // Attack cooldown rings (visual)
+    function drawCooldown(p) {
+      const cd = p.atkCooldown / ATK_COOLDOWN;
+      if (cd <= 0) return;
+      ctx.strokeStyle = "rgba(255,255,255,0.25)";
+      ctx.lineWidth = 4;
       ctx.beginPath();
-      ctx.fillStyle = 'rgba(255,255,255,.92)';
-      ctx.arc(b.x, b.y, BUL.r, 0, Math.PI*2);
-      ctx.fill();
-    }
-
-    if (shootJoy.mag > 0.2 && !gameOver) {
-      const d = norm(shootJoy.dx, shootJoy.dy);
-      ctx.strokeStyle = 'rgba(74,163,255,.35)';
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.moveTo(p1.x, p1.y);
-      ctx.lineTo(p1.x + d.x*90, p1.y + d.y*90);
+      ctx.arc(p.x, p.y, p.r + 10, -Math.PI/2, -Math.PI/2 + (Math.PI*2)*cd);
       ctx.stroke();
     }
+    drawCooldown(p1);
+    drawCooldown(p2);
   }
 
-  function drawPlayer(p) {
-    ctx.beginPath();
-    ctx.fillStyle = p.color;
-    ctx.arc(p.x, p.y, P.r, 0, Math.PI*2);
-    ctx.fill();
+  function loop(ts) {
+    const dt = Math.min(0.033, (ts - lastTs) / 1000);
+    lastTs = ts;
 
-    ctx.strokeStyle = 'rgba(0,0,0,.35)';
-    ctx.lineWidth = 3;
-    ctx.stroke();
+    if (running) update(dt);
+    draw();
 
-    ctx.beginPath();
-    ctx.fillStyle = 'rgba(0,0,0,.25)';
-    ctx.arc(p.x + 6, p.y - 4, 3, 0, Math.PI*2);
-    ctx.fill();
+    requestAnimationFrame(loop);
   }
 
-  requestAnimationFrame(step);
+  // Ensure roundRect exists (older browsers)
+  if (!CanvasRenderingContext2D.prototype.roundRect) {
+    CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r) {
+      r = Math.min(r, w/2, h/2);
+      this.beginPath();
+      this.moveTo(x+r, y);
+      this.arcTo(x+w, y, x+w, y+h, r);
+      this.arcTo(x+w, y+h, x, y+h, r);
+      this.arcTo(x, y+h, x, y, r);
+      this.arcTo(x, y, x+w, y, r);
+      this.closePath();
+      return this;
+    };
+  }
+
+  // Start
+  restart();
+  requestAnimationFrame(loop);
+
+  // Prevent page scroll on touch
+  document.addEventListener('touchmove', (e) => e.preventDefault(), {passive:false});
 })();
 </script>
 </body>
